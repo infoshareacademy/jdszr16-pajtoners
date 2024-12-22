@@ -18,7 +18,8 @@ def load_data():
 def display_data(df):
     """Function to display the loaded data."""
     st.subheader("Podgląd danych")
-    st.write(df.head())
+    if df is not None:
+        st.write(df.head())
 
 def filter_data_by_user_id(df):
     """Function to filter data by user ID."""
@@ -28,13 +29,26 @@ def filter_data_by_user_id(df):
     st.session_state.user_id = st.number_input("Wpisz user_id", min_value=0, step=1, value=st.session_state.user_id)
     if st.session_state.user_id in df['user_id'].values:
         filtered_df = df[df['user_id'] == st.session_state.user_id]
-        st.subheader(f"Dane dla user_id: {st.session_state.user_id}")
-        st.write(filtered_df)
-        st.subheader("Podstawowe informacje o przefiltrowanych danych")
-        st.write(filtered_df.describe().T)
+        st.subheader("Podsumowanie dla wybranego użytkownika")
+
+        # Create a summary row for the selected user
+        summary_text = (
+            f"Wiek: {filtered_df['age'].iloc[0]}\n"
+            f"Płeć: {'mężczyzna' if filtered_df['gender'].iloc[0] == 1 else 'kobieta'}\n"
+            f"Wzrost (cm): {filtered_df['height'].iloc[0]}\n"
+            f"Waga (kg): {filtered_df['weight'].iloc[0]}\n"
+            f"Suma kroków: {filtered_df['Steps'].sum():.2f}\n"
+            f"Średnie tętno: {filtered_df['Heart'].mean():.2f}\n"
+            f"Suma kalorii: {filtered_df['Calories'].sum():.2f}\n"
+            f"Suma dystansu (km): {filtered_df['Distance'].sum():.2f}"
+        )
+
+        st.text_area("Szczegóły użytkownika:", value=summary_text, height=200, disabled=True)
+
         return filtered_df
     else:
         st.warning(f"Brak danych dla user_id: {st.session_state.user_id}")
+        st.session_state.filtered_data = None
         return df
 
 def plot_correlated_charts(df):
@@ -80,10 +94,10 @@ def apply_pca_and_kmeans(df):
 
 def predictive_data_section():
     st.subheader("Dane predykcyjne")
-    data = st.session_state.get('data')
+    filtered_data = st.session_state.get('filtered_data')
 
-    if data is not None:
-        pca_data, clusters = apply_pca_and_kmeans(data)
+    if filtered_data is not None and not filtered_data.empty:
+        pca_data, clusters = apply_pca_and_kmeans(filtered_data)
         if pca_data is not None:
             st.write("### Wizualizacja PCA i KMeans")
             fig, ax = plt.subplots(figsize=(8, 6))
@@ -96,23 +110,32 @@ def predictive_data_section():
             ax.set_ylabel("PCA2")
             st.pyplot(fig)
 
-            # Upewnij się, że dane są aktualizowane na podstawie zmiany user_id
-            user_id = st.session_state.user_id
-            if user_id in data['user_id'].values:
-                user_cluster = data.loc[data['user_id'] == user_id, 'Cluster'].values[0]
-                st.write(f"Twój klaster to: **{user_cluster}**")
+            user_cluster = clusters[0]  # Zakładamy, że mamy dane tylko dla jednego użytkownika
+            st.write(f"Twój klaster to: **{user_cluster + 1}**")
 
-                cluster_info = st.text_area(
-                    f"Opis klastra {user_cluster}:",
-                    "Wprowadź szczegółowy opis tego klastra tutaj...",
-                    key=f"cluster_info_{user_cluster}"
+            cluster_descriptions = {
+                0: (
+                    "grupa o wysokim ryzyku",
+                    "Na podstawie wysokiego poziomu cholesterolu, wysokiego ciśnienia krwi oraz niskiej aktywności fizycznej, użytkownik został przypisany do grupy wysokiego ryzyka. Zalecane działania to regularne badania medyczne, wprowadzenie diety niskotłuszczowej, zwiększenie aktywności fizycznej oraz konsultacja z lekarzem."
+                ),
+                1: (
+                    "grupa umiarkowanego ryzyka",
+                    "Na podstawie średnich wartości cholesterolu i ciśnienia krwi oraz umiarkowanej aktywności fizycznej, użytkownik został przypisany do grupy umiarkowanego ryzyka. Zalecane działania to kontynuowanie zdrowych nawyków żywieniowych, utrzymywanie aktywności fizycznej oraz regularne badania medyczne."
+                ),
+                2: (
+                    "grupa o niskim ryzyku",
+                    "Na podstawie niskiego poziomu cholesterolu, prawidłowego ciśnienia krwi oraz wysokiej aktywności fizycznej, użytkownik został przypisany do grupy niskiego ryzyka. Zalecane działania to utrzymanie zdrowego stylu życia, regularne kontrole medyczne oraz unikanie przewlekłego stresu."
                 )
-                st.write(f"Twój opis klastra: {cluster_info}")
+            }
+
+            cluster_description, detailed_description = cluster_descriptions.get(user_cluster, ("Nieznana grupa", "Brak dodatkowych informacji."))
+            st.write(f"Opis: {cluster_description}")
+            st.write(detailed_description)
     else:
         st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
-        
+
 def main():
-    # Dodanie stałego menu
+    
     with st.sidebar:
         st.markdown(
             """
