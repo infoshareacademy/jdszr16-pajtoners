@@ -2,6 +2,8 @@ from streamlit_option_menu import option_menu
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
+from sklearn.model_selection import train_test_split
 
 import streamlit as st
 import pandas as pd
@@ -76,9 +78,9 @@ def plot_charts(df):
     else:
         st.warning("Najpierw wybierz użytkownika w zakładce 'Wczytaj dane'.")
 
-def predictive_data_section():
+def predictive_heart_section():
     
-    st.subheader("Dane predykcyjne")
+    st.subheader("Ryzyko sercowe")
     filtered_data = st.session_state.get('filtered_data')
 
     if filtered_data is not None and not filtered_data.empty:
@@ -205,6 +207,51 @@ def activity_evaluation_section():
             st.write(cluster_descriptions[user_cluster])
     else:
         st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
+        
+def improving_fitness():
+    """
+    Funkcja Streamlit do przewidywania poprawy kondycji użytkownika na podstawie modelu ML.
+    """
+    st.subheader("Przewidywanie poprawy kondycji")
+
+    # Pobieranie danych z session_state
+    try:
+        filtered_data = st.session_state.get('filtered_data')
+
+        if filtered_data is None or filtered_data.empty:
+            st.error("Dane użytkownika nie zostały wczytane. Wróć do zakładki 'Wczytaj dane' i wybierz użytkownika.")
+            return
+
+        selected_columns = ['Steps', 'Distance', 'Calories', 'Heart', 'RestingHeartrate', 'age', 'weight']
+        filtered_data = filtered_data[selected_columns]
+
+        filtered_data['Improvement'] = (filtered_data['Steps'].diff().fillna(0) > 0).astype(int)
+        filtered_data.dropna(inplace=True)
+
+        X = filtered_data.drop(columns=['Improvement'])
+        y = filtered_data['Improvement']
+
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X_train)
+
+        model = XGBClassifier(random_state=42, use_label_encoder=False, eval_metric='logloss')
+        model.fit(X_train, y_train)
+
+    except Exception as e:
+        st.error(f"Wystąpił problem z przygotowaniem modelu: {e}")
+        return
+
+    if st.button("Przewiduj poprawę kondycji"):
+        try:
+            user_data_scaled = scaler.transform(X_test)
+            predictions = model.predict(user_data_scaled)
+            st.write("### Wyniki przewidywania")
+            st.write(pd.DataFrame({"Data": X_test.tolist(), "Prediction": predictions.tolist()}))
+
+        except Exception as e:
+            st.error(f"Wystąpił problem z przewidywaniem: {e}")
 
 def main():
     
@@ -226,8 +273,8 @@ def main():
         )
         menu = option_menu(
             menu_title="Menu",  
-            options=["Wczytaj dane", "Wykresy", "Dane predykcyjne", "Ocena aktywności"],  
-            icons=["cloud-upload", "bar-chart-line", "robot", "clipboard-check"], 
+            options=["Wczytaj dane", "Wykresy", "Ryzyko sercowe", "Ocena aktywności", "Poprawa kondycji", "O aplikacji"],  
+            icons=["cloud-upload", "bar-chart-line", "heart", "clipboard-check", "person-arms-up", "gear"], 
             menu_icon="cast", 
             default_index=0,
             orientation="vertical",
@@ -252,11 +299,14 @@ def main():
         else:
             st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
 
-    elif menu == "Dane predykcyjne":
-        predictive_data_section()
+    elif menu == "Ryzyko sercowe":
+        predictive_heart_section()
 
     elif menu == "Ocena aktywności":
         activity_evaluation_section()
+        
+    elif menu == "Poprawa kondycji":
+        improving_fitness()
 
 if __name__ == "__main__":
     main()
