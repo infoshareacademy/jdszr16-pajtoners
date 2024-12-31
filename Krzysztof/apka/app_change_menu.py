@@ -1,6 +1,7 @@
 from streamlit_option_menu import option_menu
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 
 import streamlit as st
 import pandas as pd
@@ -27,12 +28,15 @@ def filter_data_by_user_id(df):
     if "user_id" not in st.session_state:
         st.session_state.user_id = 0
 
+    # Dynamic `user_id`
     st.session_state.user_id = st.number_input("Wpisz user_id", min_value=0, step=1, value=st.session_state.user_id)
+    
     if st.session_state.user_id in df['user_id'].values:
         filtered_df = df[df['user_id'] == st.session_state.user_id]
-        st.session_state.filtered_data = filtered_df.copy()
+        st.session_state.filtered_data = filtered_df
 
         st.subheader("Podsumowanie dla wybranego użytkownika")
+        
         summary_text = (
             f"Wiek: {filtered_df['age'].iloc[0]}\n"
             f"Płeć: {'mężczyzna' if filtered_df['gender'].iloc[0] == 1 else 'kobieta'}\n"
@@ -43,40 +47,34 @@ def filter_data_by_user_id(df):
             f"Suma kalorii: {filtered_df['Calories'].sum():.2f}\n"
             f"Suma dystansu (km): {filtered_df['Distance'].sum():.2f}"
         )
-
         st.text_area("Szczegóły użytkownika:", value=summary_text, height=200, disabled=True)
-
         return filtered_df
     else:
         st.warning(f"Brak danych dla user_id: {st.session_state.user_id}")
         st.session_state.filtered_data = None
-        return df
+        return None
 
-def plot_correlated_charts(df):
-    """Function to plot the correlation charts"""
+def plot_charts(df):
+    """Function to plot charts"""
     st.header("Analiza wykresów")
-    st.write("W tej sekcji prezentujemy wykresy najważniejszych korelacji między zmiennymi w zestawie danych.")
-    st.subheader("Najlepiej skorelowane kolumny - Wizualizacja")
+    st.subheader("W tej sekcji prezentujemy wykresy najważniejszych korelacji między zmiennymi w zestawie danych.")
 
-    correlation_matrix = df.corr(numeric_only=True)
-    top_correlations = correlation_matrix.abs().unstack().sort_values(ascending=False)
-    top_correlations = top_correlations[top_correlations < 1].drop_duplicates().head(3)
-
-    for (col1, col2), corr_value in top_correlations.items():
-        st.write(f"### Wykres Distplot dla: **{col1}** i **{col2}**")
-        st.write(f"Współczynnik korelacji: {corr_value:.2f}")
-
-        fig, ax = plt.subplots(figsize=(8, 6))
-        sns.histplot(df[col1], kde=True, color="blue", label=col1, ax=ax, alpha=0.5)
-        st.pyplot(fig)
-
-        fig, ax = plt.subplots(figsize=(8, 6))
-        sns.histplot(df[col2], kde=True, color="orange", label=col2, ax=ax, alpha=0.5)
-        ax.legend()
-        ax.set_title(f"{col1} vs {col2}")
-        ax.set_xlabel("Wartości")
-        ax.set_ylabel("Częstość")
-        st.pyplot(fig)
+    filtered_data = st.session_state.get('filtered_data')
+    
+    if filtered_data is not None and not filtered_data.empty:
+        st.subheader("Średnie tętno dla każdej aktywności")
+        if 'activity_trimmed' in filtered_data.columns and 'Heart' in filtered_data.columns:
+            mean_heart_by_activity = filtered_data.groupby('activity_trimmed')['Heart'].mean().reset_index()
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.barplot(data=mean_heart_by_activity, x='activity_trimmed', y='Heart', ax=ax)
+            ax.set_title('Średnie tętno dla każdej aktywności')
+            ax.set_xlabel('Rodzaj aktywności')
+            ax.set_ylabel('Średnie tętno')
+            st.pyplot(fig)
+        else:
+            st.warning("Brak wymaganych kolumn 'activity_trimmed' lub 'Heart' w danych.")
+    else:
+        st.warning("Najpierw wybierz użytkownika w zakładce 'Wczytaj dane'.")
 
 def predictive_data_section():
     
@@ -90,65 +88,123 @@ def predictive_data_section():
             st.warning("Brak wystarczających danych numerycznych do analizy PCA i KMeans.")
             return
 
-        pca_data, clusters = apply_pca_and_kmeans(numeric_data)
+        pca_data, clusters = apply_kmeans_heart_based(numeric_data)
         if pca_data is not None:
-            st.write("### Wizualizacja PCA i KMeans")
+            st.write("### Wizualizacja KMeans")
             fig, ax = plt.subplots(figsize=(8, 6))
             scatter = ax.scatter(
                 pca_data[:, 0], pca_data[:, 1], c=clusters, cmap='viridis', alpha=0.7
             )
             plt.colorbar(scatter, label="Klaster")
-            ax.set_title("PCA i KMeans - Przypisanie do klastrów")
-            ax.set_xlabel("PCA1")
-            ax.set_ylabel("PCA2")
+            ax.set_title("KMeans - Przypisanie do klastrów")
+            ax.set_xlabel("Feature 1")
+            ax.set_ylabel("Feature 2")
             st.pyplot(fig)
 
             user_cluster = clusters[0]
-            st.write(f"Nasz program przypisał Cię do klastra: **{user_cluster + 1}**")  
-            
-            title, description = describe_clusters(user_cluster + 1)
-            st.write(f"### {title}")
-            st.write(description)       
+            st.write(f"Nasz program przypisał Cię do klastra: {user_cluster}")
+
+            cluster_descriptions = {
+                0: "Niskie ryzyko sercowe: Użytkownicy w tym klastrze mają stabilne tętno spoczynkowe oraz niskie wartości znormalizowanego tętna. Wskaźniki te sugerują dobrą kondycję serca oraz niskie ryzyko wystąpienia problemów sercowo-naczyniowych. Zaleca się kontynuowanie obecnego stylu życia z naciskiem na regularną aktywność fizyczną i zbilansowaną dietę.",
+                1: "Umiarkowane ryzyko sercowe: Użytkownicy w tym klastrze mają umiarkowane wartości tętna spoczynkowego oraz średnie korelacje między tętnem a aktywnością krokową. Wskazuje to na pewne wyzwania dla układu sercowo-naczyniowego, ale bez znaczących zagrożeń. Rekomenduje się włączenie umiarkowanych ćwiczeń aerobowych i kontrolowanie masy ciała. Regularne badania sercowo-naczyniowe są wskazane, aby monitorować ewentualne zmiany.",
+                2: "Wysokie ryzyko sercowe: Użytkownicy mają podwyższone tętno spoczynkowe, a korelacje między aktywnością a tętnem są niewielkie lub niestabilne. Może to sugerować przeciążenie serca lub inne nieprawidłowości. Zaleca się pilną konsultację z lekarzem w celu wykonania szczegółowych badań. Ważne jest także wprowadzenie zmian w stylu życia, takich jak dieta uboga w tłuszcze nasycone i unikanie stresu."
+            }
+
+            if user_cluster in cluster_descriptions:
+                st.write(f"### Opis klastra {user_cluster}")
+                st.write(cluster_descriptions[user_cluster])
     else:
         st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
 
-def apply_pca_and_kmeans(df):
-    """PCA and KMeans clustering."""
+def apply_kmeans_heart_based(df):
+    """KMeans clustering based on heart-related features."""
     if df is not None:
-        st.write("Przeprowadzamy analizę PCA i KMeans...")
-        pca = PCA(n_components=2)
-        pca_data = pca.fit_transform(df.select_dtypes(include=[np.number]).dropna())
+        st.write("Przeprowadzamy analizę KMeans...")
+        kmeans_features = ['Heart', 'RestingHeartrate', 'NormalizedHeartrate', 'CorrelationHeartrateSteps', 'age', 'weight']
 
-        kmeans = KMeans(n_clusters=3, random_state=42)
-        clusters = kmeans.fit_predict(pca_data)
+        # Check for missing features
+        available_features = [f for f in kmeans_features if f in df.columns]
+        if len(available_features) < len(kmeans_features):
+            missing = set(kmeans_features) - set(available_features)
+            st.warning(f"Brakuje następujących cech: {missing}")
 
+        # Standardize the data
+        scaler = StandardScaler()
+        standardized_data = scaler.fit_transform(df[available_features].dropna())
+
+        # Apply KMeans clustering
+        kmeans = KMeans(n_clusters=3, random_state=42, init='k-means++', max_iter=500)
+        clusters = kmeans.fit_predict(standardized_data)
+
+        # Add clusters to the original dataframe
         df['Cluster'] = clusters
-        return pca_data, clusters
+
+        return standardized_data, clusters
     else:
         st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
         return None, None
 
-def describe_clusters(cluster_id):
-    cluster_descriptions = {
-        0: (
-            "Co oznacza klaster 0? -> Niska aktywność",
-            "Użytkownicy w tym klastrze są najmniej aktywni fizycznie. Charakteryzują się niską liczbą kroków, minimalnym spalaniem kalorii i krótkimi dystansami. "
-            "To może wskazywać na siedzący tryb życia lub ograniczenia fizyczne. Zaleca się stopniowe zwiększanie aktywności fizycznej, np. spacerów, "
-            "oraz konsultację z lekarzem w celu oceny stanu zdrowia."
-        ),
-        1: (
-            "Co oznacza klaster 1? -> Wysoka aktywność",
-            "Osoby w tej grupie są bardzo aktywne fizycznie, regularnie osiągają wysoką liczbę kroków i dystansów. "
-            "Często angażują się w ćwiczenia aerobowe lub inne formy aktywności fizycznej. Zaleca się utrzymanie obecnego poziomu aktywności oraz monitorowanie postępów, aby unikać przemęczenia."
-        ),
-        2: (
-            "Co oznacza klaster 2? -> Umiarkowana aktywność",
-            "Użytkownicy w tym klastrze charakteryzują się umiarkowanym poziomem aktywności fizycznej. "
-            "Regularnie angażują się w aktywność o średniej intensywności. To zrównoważony styl życia, który warto kontynuować i rozwijać poprzez stopniowe zwiększanie intensywności ćwiczeń."
+def activity_evaluation_section():
+    """Evaluate user activity using PCA and clustering."""
+    st.subheader("Ocena aktywności")
+    filtered_data = st.session_state.get('filtered_data')
+
+    if filtered_data is not None and not filtered_data.empty:
+        st.write("### Szczegółowa analiza aktywności")
+
+        # Select features for PCA and clustering
+        activity_features = ['Steps', 'Distance', 'Calories', 'Heart', 'RestingHeartrate']
+        available_features = [f for f in activity_features if f in filtered_data.columns]
+
+        if len(available_features) < len(activity_features):
+            missing_features = set(activity_features) - set(available_features)
+            st.warning(f"Brakuje następujących cech: {missing_features}")
+
+        # Increase weights for critical features
+        weighted_data = filtered_data.copy()
+        if 'Steps' in weighted_data.columns:
+            weighted_data['Steps'] *= 1.5
+        if 'Calories' in weighted_data.columns:
+            weighted_data['Calories'] *= 1.2
+
+        # Standardize the data
+        scaler = StandardScaler()
+        standardized_data = scaler.fit_transform(weighted_data[available_features].dropna())
+
+        # Apply PCA
+        pca = PCA(n_components=2)
+        pca_data = pca.fit_transform(standardized_data)
+
+        # Apply KMeans clustering
+        kmeans = KMeans(n_clusters=3, random_state=42, init='k-means++', max_iter=500)
+        clusters = kmeans.fit_predict(pca_data)
+        filtered_data['Cluster'] = clusters
+
+        # Visualize PCA results
+        fig, ax = plt.subplots(figsize=(8, 6))
+        scatter = ax.scatter(
+            pca_data[:, 0], pca_data[:, 1], c=clusters, cmap='viridis', alpha=0.7
         )
-    }
-    
-    return cluster_descriptions.get(cluster_id, ("Nieznany klaster", "Brak opisu dla tego klastra."))
+        plt.colorbar(scatter, label="Klaster")
+        ax.set_title("PCA i KMeans - Aktywność użytkowników")
+        ax.set_xlabel("PCA1")
+        ax.set_ylabel("PCA2")
+        st.pyplot(fig)
+
+        # Add descriptions for clusters
+        cluster_descriptions = {
+            0: "Niska aktywność: Użytkownicy z minimalną liczbą kroków i spalonymi kaloriami. Zalecana zwiększona aktywność fizyczna.",
+            1: "Umiarkowana aktywność: Użytkownicy o średnich wartościach aktywności. Dobra równowaga między aktywnością a regeneracją.",
+            2: "Wysoka aktywność: Użytkownicy bardzo aktywni z dużą liczbą kroków i dystansem. Zalecane monitorowanie obciążenia fizycznego."
+        }
+
+        # Display cluster description for the current user
+        user_cluster = filtered_data['Cluster'].iloc[0]
+        if user_cluster in cluster_descriptions:
+            st.write(f"### Opis klastra {user_cluster}")
+            st.write(cluster_descriptions[user_cluster])
+    else:
+        st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
 
 def main():
     
@@ -170,8 +226,8 @@ def main():
         )
         menu = option_menu(
             menu_title="Menu",  
-            options=["Wczytaj dane", "Wykresy", "Dane predykcyjne"],  
-            icons=["cloud-upload", "bar-chart-line", "robot"], 
+            options=["Wczytaj dane", "Wykresy", "Dane predykcyjne", "Ocena aktywności"],  
+            icons=["cloud-upload", "bar-chart-line", "robot", "clipboard-check"], 
             menu_icon="cast", 
             default_index=0,
             orientation="vertical",
@@ -192,12 +248,15 @@ def main():
 
     elif menu == "Wykresy":
         if st.session_state.data is not None:
-            plot_correlated_charts(st.session_state.data)
+            plot_charts(st.session_state.data)
         else:
             st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
 
     elif menu == "Dane predykcyjne":
         predictive_data_section()
+
+    elif menu == "Ocena aktywności":
+        activity_evaluation_section()
 
 if __name__ == "__main__":
     main()
