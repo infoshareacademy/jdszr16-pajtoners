@@ -59,11 +59,14 @@ def filter_data_by_user_id(df):
 def plot_charts(df):
     """Function to plot charts"""
     st.header("Analiza wykresów")
-    st.subheader("W tej sekcji prezentujemy wykresy najważniejszych korelacji między zmiennymi w zestawie danych.")
+    st.divider()
+    st.markdown("W tej sekcji prezentujemy wykresy najważniejszych korelacji między zmiennymi w zestawie danych.")
+    st.divider()
 
     filtered_data = st.session_state.get('filtered_data')
     
     if filtered_data is not None and not filtered_data.empty:
+        # Wykres średniego tętna dla aktywności
         st.subheader("Średnie tętno dla każdej aktywności")
         if 'activity_trimmed' in filtered_data.columns and 'Heart' in filtered_data.columns:
             mean_heart_by_activity = filtered_data.groupby('activity_trimmed')['Heart'].mean().reset_index()
@@ -75,12 +78,29 @@ def plot_charts(df):
             st.pyplot(fig)
         else:
             st.warning("Brak wymaganych kolumn 'activity_trimmed' lub 'Heart' w danych.")
+
+        st.divider()
+        st.subheader("Zależność między spalonymi kaloriami a dystansem")
+        if 'Calories' in filtered_data.columns and 'Distance' in filtered_data.columns:
+            # Sortowanie danych według dystansu
+            sorted_data = filtered_data.sort_values(by='Distance')
+            
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.lineplot(data=sorted_data, x='Distance', y='Calories', ax=ax, color='blue', lw=2)
+            ax.set_title("Zależność między spalonymi kaloriami a dystansem")
+            ax.set_xlabel("Dystans (km)")
+            ax.set_ylabel("Spalone kalorie")
+            st.pyplot(fig)
+        else:
+            st.warning("Brak wymaganych kolumn 'Calories' lub 'Distance' w danych.")
     else:
         st.warning("Najpierw wybierz użytkownika w zakładce 'Wczytaj dane'.")
 
 def predictive_heart_section():
     
-    st.subheader("Ryzyko sercowe")
+    st.header("Ryzyko sercowe")
+    st.divider()
+    st.markdown("Sekcja ta analizuje dane dotyczące Twojego tętna, wieku oraz innych cech zdrowotnych, aby ocenić ryzyko problemów sercowo-naczyniowych. Na podstawie zaawansowanego algorytmu grupowania (KMeans) użytkownicy są przypisywani do jednego z trzech klastrów, które reprezentują różne poziomy ryzyka: niskie, umiarkowane lub wysokie. Wyniki są prezentowane w formie wykresu klastrów oraz szczegółowego opisu przypisanego klastru, wraz z rekomendacjami dotyczącymi stylu życia i działań prozdrowotnych. Dzięki tej analizie możesz lepiej zrozumieć swoje ryzyko sercowe i podjąć kroki w celu jego zmniejszenia.")
     filtered_data = st.session_state.get('filtered_data')
 
     if filtered_data is not None and not filtered_data.empty:
@@ -92,7 +112,7 @@ def predictive_heart_section():
 
         pca_data, clusters = apply_kmeans_heart_based(numeric_data)
         if pca_data is not None:
-            st.write("### Wizualizacja KMeans")
+            st.write("### Szczegółowa analiza oceny ryzyka sercowego")
             fig, ax = plt.subplots(figsize=(8, 6))
             scatter = ax.scatter(
                 pca_data[:, 0], pca_data[:, 1], c=clusters, cmap='viridis', alpha=0.7
@@ -104,8 +124,7 @@ def predictive_heart_section():
             st.pyplot(fig)
 
             user_cluster = clusters[0]
-            st.write(f"Nasz program przypisał Cię do klastra: {user_cluster}")
-
+            
             cluster_descriptions = {
                 0: "Niskie ryzyko sercowe: Użytkownicy w tym klastrze mają stabilne tętno spoczynkowe oraz niskie wartości znormalizowanego tętna. Wskaźniki te sugerują dobrą kondycję serca oraz niskie ryzyko wystąpienia problemów sercowo-naczyniowych. Zaleca się kontynuowanie obecnego stylu życia z naciskiem na regularną aktywność fizyczną i zbilansowaną dietę.",
                 1: "Umiarkowane ryzyko sercowe: Użytkownicy w tym klastrze mają umiarkowane wartości tętna spoczynkowego oraz średnie korelacje między tętnem a aktywnością krokową. Wskazuje to na pewne wyzwania dla układu sercowo-naczyniowego, ale bez znaczących zagrożeń. Rekomenduje się włączenie umiarkowanych ćwiczeń aerobowych i kontrolowanie masy ciała. Regularne badania sercowo-naczyniowe są wskazane, aby monitorować ewentualne zmiany.",
@@ -121,7 +140,7 @@ def predictive_heart_section():
 def apply_kmeans_heart_based(df):
     """KMeans clustering based on heart-related features."""
     if df is not None:
-        st.write("Przeprowadzamy analizę KMeans...")
+        st.divider()
         kmeans_features = ['Heart', 'RestingHeartrate', 'NormalizedHeartrate', 'CorrelationHeartrateSteps', 'age', 'weight']
 
         # Check for missing features
@@ -148,7 +167,10 @@ def apply_kmeans_heart_based(df):
 
 def activity_evaluation_section():
     """Evaluate user activity using PCA and clustering."""
-    st.subheader("Ocena aktywności")
+    st.header("Ocena aktywności")
+    st.divider()
+    st.markdown("Sekcja ta analizuje Twoje dane związane z codzienną aktywnością, takie jak liczba kroków, spalone kalorie, dystans i tętno. Wykorzystując techniki analizy danych, takie jak PCA i algorytm grupowania (KMeans), aplikacja klasyfikuje Twoje poziomy aktywności do jednego z trzech klastrów: niskiej, umiarkowanej lub wysokiej aktywności. Wyniki są prezentowane w formie wizualizacji na wykresie oraz opisów, które pomogą Ci zrozumieć Twój obecny poziom aktywności i uzyskać wskazówki dotyczące jej optymalizacji. Dzięki temu możesz podejmować świadome decyzje o poprawie swojego stylu życia.")
+    st.divider()
     filtered_data = st.session_state.get('filtered_data')
 
     if filtered_data is not None and not filtered_data.empty:
@@ -212,7 +234,7 @@ def improving_fitness():
     """
     Funkcja Streamlit do przewidywania poprawy kondycji użytkownika na podstawie modelu ML.
     """
-    st.subheader("Przewidywanie poprawy kondycji")
+    st.header("Przewidywanie poprawy kondycji")
 
     try:
         filtered_data = st.session_state.get('filtered_data')
@@ -247,6 +269,7 @@ def improving_fitness():
             user_data_scaled = scaler.transform(X_test)
             predictions = model.predict(user_data_scaled)
 
+            st.divider()
             st.write("""
             ### Wyniki przewidywania poprawy kondycji
             Tabela poniżej przedstawia szczegóły dotyczące Twojej aktywności fizycznej oraz prognozowane wskazania, czy Twój poziom kondycji się poprawił w danym okresie.
@@ -263,6 +286,7 @@ def improving_fitness():
             else:
                 st.warning("Model wskazuje, że w większości przypadków brak jest poprawy kondycji. Może warto rozważyć zwiększenie liczby kroków lub dystansu?")
 
+            
             fig, ax = plt.subplots()
             ax.pie(
                 [improvement_count, no_improvement_count],
@@ -332,6 +356,11 @@ def main():
         
     elif menu == "Poprawa kondycji":
         improving_fitness()
+    
+    elif menu == "O aplikacji":
+        st.header("Witaj w naszej aplikacji, stworzonej specjalnie do analizy danych pochodzących z Apple Watch! :tada:")
+        st.divider()
+        st.write("Nasza aplikacja pozwala na wczytanie pliku zawierającego dane o Twojej aktywności fizycznej, takich jak liczba kroków, pokonany dystans, tętno czy spalone kalorie. Dzięki temu możesz w prosty i przejrzysty sposób eksplorować swoje osiągnięcia i dowiedzieć się więcej o swoich nawykach ruchowych oraz zaplanować kolejne treningi! W kolejnych zakładkach znajdziesz: Wykresy: Interaktywne wizualizacje, które pomogą Ci zrozumieć, jakie aktywności wpływały na spalone kalorie i jak wyglądają zależności pomiędzy różnymi parametrami. Podsumowanie aktywności: Szczegółowe statystyki, które pozwolą Ci przeanalizować swoje wyniki i odkryć potencjalne obszary do poprawy. Zanurz się w analizie swoich danych i odkryj, co Twoje Apple Watch ma Ci do powiedzenia! :blush:")
 
 if __name__ == "__main__":
     main()
