@@ -248,10 +248,10 @@ def improving_fitness():
             user_data_scaled = scaler.transform(X_test)
             predictions = model.predict(user_data_scaled)
             st.write("### Wyniki przewidywania")
-            st.write(pd.DataFrame({"Data": X_test.tolist(), "Prediction": predictions.tolist()}))
-
+            st.write(pd.DataFrame({"Data": X_test.to_numpy().tolist(), "Prediction": predictions.tolist()}))
         except Exception as e:
             st.error(f"Wystąpił problem z przewidywaniem: {e}")
+
 
 def main():
     
