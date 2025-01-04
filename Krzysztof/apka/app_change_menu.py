@@ -66,7 +66,7 @@ def plot_charts(df):
     filtered_data = st.session_state.get('filtered_data')
     
     if filtered_data is not None and not filtered_data.empty:
-        # Wykres średniego tętna dla aktywności
+        
         st.subheader("Średnie tętno dla każdej aktywności")
         if 'activity_trimmed' in filtered_data.columns and 'Heart' in filtered_data.columns:
             mean_heart_by_activity = filtered_data.groupby('activity_trimmed')['Heart'].mean().reset_index()
@@ -82,7 +82,7 @@ def plot_charts(df):
         st.divider()
         st.subheader("Zależność między spalonymi kaloriami a dystansem")
         if 'Calories' in filtered_data.columns and 'Distance' in filtered_data.columns:
-            # Sortowanie danych według dystansu
+            
             sorted_data = filtered_data.sort_values(by='Distance')
             
             fig, ax = plt.subplots(figsize=(10, 6))
@@ -143,21 +143,17 @@ def apply_kmeans_heart_based(df):
         st.divider()
         kmeans_features = ['Heart', 'RestingHeartrate', 'NormalizedHeartrate', 'CorrelationHeartrateSteps', 'age', 'weight']
 
-        # Check for missing features
         available_features = [f for f in kmeans_features if f in df.columns]
         if len(available_features) < len(kmeans_features):
             missing = set(kmeans_features) - set(available_features)
             st.warning(f"Brakuje następujących cech: {missing}")
 
-        # Standardize the data
         scaler = StandardScaler()
         standardized_data = scaler.fit_transform(df[available_features].dropna())
 
-        # Apply KMeans clustering
         kmeans = KMeans(n_clusters=3, random_state=42, init='k-means++', max_iter=500)
         clusters = kmeans.fit_predict(standardized_data)
 
-        # Add clusters to the original dataframe
         df['Cluster'] = clusters
 
         return standardized_data, clusters
@@ -176,7 +172,6 @@ def activity_evaluation_section():
     if filtered_data is not None and not filtered_data.empty:
         st.write("### Szczegółowa analiza aktywności")
 
-        # Select features for PCA and clustering
         activity_features = ['Steps', 'Distance', 'Calories', 'Heart', 'RestingHeartrate']
         available_features = [f for f in activity_features if f in filtered_data.columns]
 
@@ -184,27 +179,22 @@ def activity_evaluation_section():
             missing_features = set(activity_features) - set(available_features)
             st.warning(f"Brakuje następujących cech: {missing_features}")
 
-        # Increase weights for critical features
         weighted_data = filtered_data.copy()
         if 'Steps' in weighted_data.columns:
             weighted_data['Steps'] *= 1.5
         if 'Calories' in weighted_data.columns:
             weighted_data['Calories'] *= 1.2
 
-        # Standardize the data
         scaler = StandardScaler()
         standardized_data = scaler.fit_transform(weighted_data[available_features].dropna())
 
-        # Apply PCA
         pca = PCA(n_components=2)
         pca_data = pca.fit_transform(standardized_data)
 
-        # Apply KMeans clustering
         kmeans = KMeans(n_clusters=3, random_state=42, init='k-means++', max_iter=500)
         clusters = kmeans.fit_predict(pca_data)
         filtered_data['Cluster'] = clusters
 
-        # Visualize PCA results
         fig, ax = plt.subplots(figsize=(8, 6))
         scatter = ax.scatter(
             pca_data[:, 0], pca_data[:, 1], c=clusters, cmap='viridis', alpha=0.7
@@ -215,14 +205,12 @@ def activity_evaluation_section():
         ax.set_ylabel("PCA2")
         st.pyplot(fig)
 
-        # Add descriptions for clusters
         cluster_descriptions = {
             0: "Niska aktywność: Użytkownicy z minimalną liczbą kroków i spalonymi kaloriami. Zalecana zwiększona aktywność fizyczna.",
             1: "Umiarkowana aktywność: Użytkownicy o średnich wartościach aktywności. Dobra równowaga między aktywnością a regeneracją.",
             2: "Wysoka aktywność: Użytkownicy bardzo aktywni z dużą liczbą kroków i dystansem. Zalecane monitorowanie obciążenia fizycznego."
         }
 
-        # Display cluster description for the current user
         user_cluster = filtered_data['Cluster'].iloc[0]
         if user_cluster in cluster_descriptions:
             st.write(f"### Opis klastra {user_cluster}")
@@ -301,7 +289,6 @@ def improving_fitness():
         except Exception as e:
             st.error(f"Wystąpił problem z przewidywaniem: {e}")
 
-
 def main():
     
     with st.sidebar:
@@ -320,6 +307,7 @@ def main():
             """,
             unsafe_allow_html=True
         )
+        
         menu = option_menu(
             menu_title="Menu",  
             options=["Wczytaj dane", "Wykresy", "Ryzyko sercowe", "Ocena aktywności", "Poprawa kondycji", "O aplikacji"],  
@@ -360,7 +348,8 @@ def main():
     elif menu == "O aplikacji":
         st.header("Witaj w naszej aplikacji, stworzonej specjalnie do analizy danych pochodzących z Apple Watch! :tada:")
         st.divider()
-        st.write("Nasza aplikacja pozwala na wczytanie pliku zawierającego dane o Twojej aktywności fizycznej, takich jak liczba kroków, pokonany dystans, tętno czy spalone kalorie. Dzięki temu możesz w prosty i przejrzysty sposób eksplorować swoje osiągnięcia i dowiedzieć się więcej o swoich nawykach ruchowych oraz zaplanować kolejne treningi! W kolejnych zakładkach znajdziesz: Wykresy: Interaktywne wizualizacje, które pomogą Ci zrozumieć, jakie aktywności wpływały na spalone kalorie i jak wyglądają zależności pomiędzy różnymi parametrami. Podsumowanie aktywności: Szczegółowe statystyki, które pozwolą Ci przeanalizować swoje wyniki i odkryć potencjalne obszary do poprawy. Zanurz się w analizie swoich danych i odkryj, co Twoje Apple Watch ma Ci do powiedzenia! :blush:")
+        st.markdown("Nasza aplikacja pozwala na wczytanie pliku zawierającego dane o Twojej aktywności fizycznej, takich jak liczba kroków, pokonany dystans, tętno czy spalone kalorie. Dzięki temu możesz w prosty i przejrzysty sposób eksplorować swoje osiągnięcia i dowiedzieć się więcej o swoich nawykach ruchowych oraz zaplanować kolejne treningi! W kolejnych zakładkach znajdziesz: Wykresy: Interaktywne wizualizacje, które pomogą Ci zrozumieć, jakie aktywności wpływały na spalone kalorie i jak wyglądają zależności pomiędzy różnymi parametrami. Podsumowanie aktywności: Szczegółowe statystyki, które pozwolą Ci przeanalizować swoje wyniki i odkryć potencjalne obszary do poprawy.")
+        st.markdown("Zanurz się w analizie swoich danych i odkryj, co Twoje Apple Watch ma Ci do powiedzenia! :blush:")
 
 if __name__ == "__main__":
     main()
