@@ -214,7 +214,6 @@ def improving_fitness():
     """
     st.subheader("Przewidywanie poprawy kondycji")
 
-    # Pobieranie danych z session_state
     try:
         filtered_data = st.session_state.get('filtered_data')
 
@@ -248,26 +247,22 @@ def improving_fitness():
             user_data_scaled = scaler.transform(X_test)
             predictions = model.predict(user_data_scaled)
 
-            # Wprowadzenie
             st.write("""
             ### Wyniki przewidywania poprawy kondycji
             Tabela poniżej przedstawia szczegóły dotyczące Twojej aktywności fizycznej oraz prognozowane wskazania, czy Twój poziom kondycji się poprawił w danym okresie.
             """)
-            
-            # Tabela z wynikami
+           
             result_df = pd.DataFrame({"Data": X_test.to_numpy().tolist(), "Prediction": predictions.tolist()})
             st.write(result_df)
 
-            # Interpretacja wyników
-            if 1 in predictions:
-                st.success("Gratulacje! Nasz model przewiduje, że Twoja kondycja poprawiła się w oparciu o wprowadzone dane.")
-            else:
-                st.warning("Model nie wykrył znaczącej poprawy kondycji. Może warto rozważyć zwiększenie liczby kroków lub dystansu?")
-
-            # Wizualizacja wyników
             improvement_count = predictions.tolist().count(1)
             no_improvement_count = predictions.tolist().count(0)
-            
+
+            if improvement_count > no_improvement_count:
+                st.success("Gratulacje! Nasz model przewiduje, że Twoja kondycja poprawiła się w większości przypadków.")
+            else:
+                st.warning("Model wskazuje, że w większości przypadków brak jest poprawy kondycji. Może warto rozważyć zwiększenie liczby kroków lub dystansu?")
+
             fig, ax = plt.subplots()
             ax.pie(
                 [improvement_count, no_improvement_count],
@@ -281,6 +276,7 @@ def improving_fitness():
 
         except Exception as e:
             st.error(f"Wystąpił problem z przewidywaniem: {e}")
+
 
 def main():
     
