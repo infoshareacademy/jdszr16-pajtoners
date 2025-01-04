@@ -247,11 +247,40 @@ def improving_fitness():
         try:
             user_data_scaled = scaler.transform(X_test)
             predictions = model.predict(user_data_scaled)
-            st.write("### Wyniki przewidywania")
-            st.write(pd.DataFrame({"Data": X_test.to_numpy().tolist(), "Prediction": predictions.tolist()}))
+
+            # Wprowadzenie
+            st.write("""
+            ### Wyniki przewidywania poprawy kondycji
+            Tabela poniżej przedstawia szczegóły dotyczące Twojej aktywności fizycznej oraz prognozowane wskazania, czy Twój poziom kondycji się poprawił w danym okresie.
+            """)
+            
+            # Tabela z wynikami
+            result_df = pd.DataFrame({"Data": X_test.to_numpy().tolist(), "Prediction": predictions.tolist()})
+            st.write(result_df)
+
+            # Interpretacja wyników
+            if 1 in predictions:
+                st.success("Gratulacje! Nasz model przewiduje, że Twoja kondycja poprawiła się w oparciu o wprowadzone dane.")
+            else:
+                st.warning("Model nie wykrył znaczącej poprawy kondycji. Może warto rozważyć zwiększenie liczby kroków lub dystansu?")
+
+            # Wizualizacja wyników
+            improvement_count = predictions.tolist().count(1)
+            no_improvement_count = predictions.tolist().count(0)
+            
+            fig, ax = plt.subplots()
+            ax.pie(
+                [improvement_count, no_improvement_count],
+                labels=['Poprawa', 'Brak poprawy'],
+                autopct='%1.1f%%',
+                colors=['green', 'red'],
+                startangle=90
+            )
+            ax.set_title("Przewidywana poprawa kondycji")
+            st.pyplot(fig)
+
         except Exception as e:
             st.error(f"Wystąpił problem z przewidywaniem: {e}")
-
 
 def main():
     
