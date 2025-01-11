@@ -67,6 +67,23 @@ def plot_charts(df):
     
     if filtered_data is not None and not filtered_data.empty:
         
+        st.subheader("Proporcje aktywności użytkownika")
+        if 'activity_trimmed' in filtered_data.columns:
+            activity_counts = filtered_data['activity_trimmed'].value_counts()
+            fig, ax = plt.subplots(figsize=(8, 8))
+            ax.pie(
+                activity_counts,
+                labels=activity_counts.index,
+                autopct='%1.1f%%',
+                startangle=90,
+                colors=sns.color_palette("pastel")
+            )
+            ax.set_title("Proporcje czasu spędzonego na różnych aktywnościach")
+            st.pyplot(fig)
+        else:
+            st.warning("Brak wymaganej kolumny 'activity_trimmed' w danych.")
+        
+        st.divider()
         st.subheader("Średnie tętno dla każdej aktywności")
         if 'activity_trimmed' in filtered_data.columns and 'Heart' in filtered_data.columns:
             mean_heart_by_activity = filtered_data.groupby('activity_trimmed')['Heart'].mean().reset_index()
@@ -86,9 +103,9 @@ def plot_charts(df):
             sorted_data = filtered_data.sort_values(by='Distance')
             
             fig, ax = plt.subplots(figsize=(10, 6))
-            sns.lineplot(data=sorted_data, x='Distance', y='Calories', ax=ax, color='blue', lw=2)
+            sns.lineplot(data=sorted_data, x='Steps', y='Calories', ax=ax, color='blue', lw=2)
             ax.set_title("Zależność między spalonymi kaloriami a dystansem")
-            ax.set_xlabel("Dystans (km)")
+            ax.set_xlabel("Kroki")
             ax.set_ylabel("Spalone kalorie")
             st.pyplot(fig)
         else:
@@ -288,6 +305,41 @@ def improving_fitness():
 
         except Exception as e:
             st.error(f"Wystąpił problem z przewidywaniem: {e}")
+            
+def goals_and_progress():
+    """Track user goals and progress."""
+    st.header("Cele i postępy")
+    st.divider()
+    filtered_data = st.session_state.get('filtered_data')
+
+    if filtered_data is None or filtered_data.empty:
+        st.warning("Najpierw wczytaj dane i wybierz użytkownika.")
+        return
+
+    st.subheader("Ustaw swoje cele")
+    steps_goal = st.number_input("Cel kroków", min_value=0, value=10000, step=1000)
+    calories_goal = st.number_input("Cel kalorii", min_value=0, value=500, step=100)
+    distance_goal = st.number_input("Cel dystansu (km)", min_value=0.0, value=5.0, step=0.5)
+
+    st.subheader("Postęp w realizacji celów")
+    total_steps = filtered_data['Steps'].sum()
+    total_calories = filtered_data['Calories'].sum()
+    total_distance = filtered_data['Distance'].sum()
+
+    st.write(f"Twoje kroki: {total_steps:.0f} / {steps_goal} ({(total_steps / steps_goal) * 100:.2f}%)")
+    st.write(f"Twoje kalorie: {total_calories:.1f} / {calories_goal} ({(total_calories / calories_goal) * 100:.2f}%)")
+    st.write(f"Twój dystans: {total_distance:.2f} km / {distance_goal} km ({(total_distance / distance_goal) * 100:.2f}%)")
+
+    fig, ax = plt.subplots()
+    categories = ['Kroki', 'Kalorie', 'Dystans']
+    values = [
+        (total_steps / steps_goal) * 100,
+        (total_calories / calories_goal) * 100,
+        (total_distance / distance_goal) * 100
+    ]
+    ax.bar(categories, values, color=['#1b4332', '#40916c', '#74c69d'])
+    ax.set_ylim(0, 150)
+    st.pyplot(fig)
 
 def main():
     
@@ -310,8 +362,8 @@ def main():
         
         menu = option_menu(
             menu_title="Menu",  
-            options=["Wczytaj dane", "Wykresy", "Ryzyko sercowe", "Ocena aktywności", "Poprawa kondycji", "O aplikacji"],  
-            icons=["cloud-upload", "bar-chart-line", "heart", "clipboard-check", "person-arms-up", "gear"], 
+            options=["Wczytaj dane", "Wykresy", "Ryzyko sercowe", "Ocena aktywności", "Poprawa kondycji", "Cele i postępy", "O aplikacji"],  
+            icons=["cloud-upload", "bar-chart-line", "heart", "clipboard-check", "person-arms-up", "graph-up-arrow", "gear"], 
             menu_icon="cast", 
             default_index=0,
             orientation="vertical",
@@ -344,6 +396,9 @@ def main():
         
     elif menu == "Poprawa kondycji":
         improving_fitness()
+        
+    elif menu == "Cele i postępy":
+        goals_and_progress()
     
     elif menu == "O aplikacji":
         st.header("Witaj w naszej aplikacji, stworzonej specjalnie do analizy danych pochodzących z Apple Watch! :tada:")
