@@ -39,17 +39,26 @@ def filter_data_by_user_id(df):
 
         st.subheader("Podsumowanie dla wybranego użytkownika")
         
-        summary_text = (
+        weight = filtered_df['weight'].iloc[0]
+        height_m = filtered_df['height'].iloc[0] / 100
+        bmi = weight / (height_m ** 2)
+        
+        max_heart = filtered_df['Heart'].max()
+        
+        summary_data = (
             f"Wiek: {filtered_df['age'].iloc[0]}\n"
             f"Płeć: {'mężczyzna' if filtered_df['gender'].iloc[0] == 1 else 'kobieta'}\n"
             f"Wzrost (cm): {filtered_df['height'].iloc[0]}\n"
             f"Waga (kg): {filtered_df['weight'].iloc[0]}\n"
+            f"Kalkulacja BMI: {bmi:.2f}\n"
             f"Suma kroków: {filtered_df['Steps'].sum():.0f}\n"
             f"Średnie tętno: {filtered_df['Heart'].mean():.2f}\n"
+            f"Maksymalne tętno: {max_heart:.2f}\n"
             f"Suma kalorii: {filtered_df['Calories'].sum():.2f}\n"
             f"Suma dystansu (km): {filtered_df['Distance'].sum():.2f}"
         )
-        st.text_area("Szczegóły użytkownika:", value=summary_text, height=200, disabled=True)
+        st.text(summary_data)
+        
         return filtered_df
     else:
         st.warning(f"Brak danych dla user_id: {st.session_state.user_id}")
@@ -84,14 +93,25 @@ def plot_charts(df):
             st.warning("Brak wymaganej kolumny 'activity_trimmed' w danych.")
         
         st.divider()
-        st.subheader("Średnie tętno dla każdej aktywności")
+        st.subheader("Wykres tętna dla każdej aktywności")
         if 'activity_trimmed' in filtered_data.columns and 'Heart' in filtered_data.columns:
             mean_heart_by_activity = filtered_data.groupby('activity_trimmed')['Heart'].mean().reset_index()
+            max_heart_by_activity = filtered_data.groupby('activity_trimmed')['Heart'].max().reset_index()
+            min_heart_by_activity = filtered_data.groupby('activity_trimmed')['Heart'].min().reset_index()
+
+            # Sort by mean heart rate descending
+            mean_heart_by_activity = mean_heart_by_activity.sort_values(by='Heart', ascending=False)
+            max_heart_by_activity = max_heart_by_activity.set_index('activity_trimmed').loc[mean_heart_by_activity['activity_trimmed']].reset_index()
+            min_heart_by_activity = min_heart_by_activity.set_index('activity_trimmed').loc[mean_heart_by_activity['activity_trimmed']].reset_index()
+            
             fig, ax = plt.subplots(figsize=(10, 6))
-            sns.barplot(data=mean_heart_by_activity, x='activity_trimmed', y='Heart', ax=ax)
-            ax.set_title('Średnie tętno dla każdej aktywności')
+            sns.barplot(data=mean_heart_by_activity, x='activity_trimmed', y='Heart', ax=ax, label="Średnie tętno")
+            sns.lineplot(data=max_heart_by_activity, x='activity_trimmed', y='Heart', ax=ax, color='red', marker='o', label="Maksymalne tętno")
+            sns.lineplot(data=min_heart_by_activity, x='activity_trimmed', y='Heart', ax=ax, color='blue', marker='o', label="Minimalne tętno")
+            ax.set_title('Średnie, maksymalne i minimalne tętno dla każdej aktywności')
             ax.set_xlabel('Rodzaj aktywności')
-            ax.set_ylabel('Średnie tętno')
+            ax.set_ylabel('Tętno')
+            ax.legend()
             st.pyplot(fig)
         else:
             st.warning("Brak wymaganych kolumn 'activity_trimmed' lub 'Heart' w danych.")
@@ -118,6 +138,7 @@ def predictive_heart_section():
     st.header("Ryzyko sercowe")
     st.divider()
     st.markdown("Sekcja ta analizuje dane dotyczące Twojego tętna, wieku oraz innych cech zdrowotnych, aby ocenić ryzyko problemów sercowo-naczyniowych. Na podstawie zaawansowanego algorytmu grupowania (KMeans) użytkownicy są przypisywani do jednego z trzech klastrów, które reprezentują różne poziomy ryzyka: niskie, umiarkowane lub wysokie. Wyniki są prezentowane w formie wykresu klastrów oraz szczegółowego opisu przypisanego klastru, wraz z rekomendacjami dotyczącymi stylu życia i działań prozdrowotnych. Dzięki tej analizie możesz lepiej zrozumieć swoje ryzyko sercowe i podjąć kroki w celu jego zmniejszenia.")
+    
     filtered_data = st.session_state.get('filtered_data')
 
     if filtered_data is not None and not filtered_data.empty:
@@ -136,8 +157,8 @@ def predictive_heart_section():
             )
             plt.colorbar(scatter, label="Klaster")
             ax.set_title("KMeans - Przypisanie do klastrów")
-            ax.set_xlabel("Feature 1")
-            ax.set_ylabel("Feature 2")
+            ax.set_xlabel("PCA 1")
+            ax.set_ylabel("PCA 2")
             st.pyplot(fig)
 
             user_cluster = clusters[0]
