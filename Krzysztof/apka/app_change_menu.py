@@ -117,19 +117,7 @@ def plot_charts(df):
             st.warning("Brak wymaganych kolumn 'activity_trimmed' lub 'Heart' w danych.")
 
         st.divider()
-        st.subheader("Zależność między spalonymi kaloriami a dystansem")
-        if 'Calories' in filtered_data.columns and 'Distance' in filtered_data.columns:
-            
-            sorted_data = filtered_data.sort_values(by='Distance')
-            
-            fig, ax = plt.subplots(figsize=(10, 6))
-            sns.lineplot(data=sorted_data, x='Steps', y='Calories', ax=ax, color='blue', lw=2)
-            ax.set_title("Zależność między spalonymi kaloriami a dystansem")
-            ax.set_xlabel("Kroki")
-            ax.set_ylabel("Spalone kalorie")
-            st.pyplot(fig)
-        else:
-            st.warning("Brak wymaganych kolumn 'Calories' lub 'Distance' w danych.")
+                
     else:
         st.warning("Najpierw wybierz użytkownika w zakładce 'Wczytaj dane'.")
 
@@ -151,16 +139,19 @@ def predictive_heart_section():
         pca_data, clusters = apply_kmeans_heart_based(numeric_data)
         if pca_data is not None:
             st.write("### Szczegółowa analiza oceny ryzyka sercowego")
-            fig, ax = plt.subplots(figsize=(8, 6))
-            scatter = ax.scatter(
-                pca_data[:, 0], pca_data[:, 1], c=clusters, cmap='viridis', alpha=0.7
-            )
-            plt.colorbar(scatter, label="Klaster")
-            ax.set_title("KMeans - Przypisanie do klastrów")
-            ax.set_xlabel("PCA 1")
-            ax.set_ylabel("PCA 2")
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.regplot(x='Intensity', y='SDNormalizedHR', data=filtered_data, scatter_kws={'alpha': 0.6}, line_kws={'color': 'red'}, ax=ax)
+            
+            scatter_handle = plt.Line2D([0], [0], color='red', label='Linia regresji')  # Uchwyty dla linii
+            points_handle = plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', alpha=0.6, label='Rytm serca')
+            
+            plt.title(' ')
+            ax.set_xlabel('Intensywność')
+            ax.set_ylabel('Wahania rytmu serca')
+            plt.legend(handles=[scatter_handle, points_handle])
+            plt.grid(True)
             st.pyplot(fig)
-
+            
             user_cluster = clusters[0]
             
             cluster_descriptions = {
@@ -170,7 +161,7 @@ def predictive_heart_section():
             }
 
             if user_cluster in cluster_descriptions:
-                st.write(f"### Opis klastra {user_cluster}")
+                st.write(f"### Model przydzielił Cię do klastra numer {user_cluster}")
                 st.write(cluster_descriptions[user_cluster])
     else:
         st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
@@ -233,15 +224,31 @@ def activity_evaluation_section():
         clusters = kmeans.fit_predict(pca_data)
         filtered_data['Cluster'] = clusters
 
-        fig, ax = plt.subplots(figsize=(8, 6))
-        scatter = ax.scatter(
-            pca_data[:, 0], pca_data[:, 1], c=clusters, cmap='viridis', alpha=0.7
+        melted_data = filtered_data.melt(
+            id_vars=['Cluster'], 
+            value_vars=['Steps', 'Heart'], 
+            var_name='Feature', 
+            value_name='Value'
         )
-        plt.colorbar(scatter, label="Klaster")
-        ax.set_title("PCA i KMeans - Aktywność użytkowników")
-        ax.set_xlabel("PCA1")
-        ax.set_ylabel("PCA2")
-        st.pyplot(fig)
+
+        polish_labels = {
+            'Steps': 'Kroki',
+            'Heart': 'Rytm serca'
+        }
+        melted_data['Feature'] = melted_data['Feature'].map(polish_labels)
+        
+        fig_bar, ax_bar = plt.subplots(figsize=(10, 6))
+        sns.barplot(
+            data=melted_data, 
+            x='Feature', 
+            y='Value', 
+            hue='Cluster', 
+            ax=ax_bar,
+        )
+        ax_bar.set_title("Średnie wartości kroków i rytmu serca w poszczególnych klastrach")
+        ax_bar.set_xlabel("Cechy aktywności")
+        ax_bar.set_ylabel("Średnia wartość")
+        st.pyplot(fig_bar)
 
         cluster_descriptions = {
             0: "Niska aktywność: Użytkownicy z minimalną liczbą kroków i spalonymi kaloriami. Zalecana zwiększona aktywność fizyczna.",
@@ -251,7 +258,7 @@ def activity_evaluation_section():
 
         user_cluster = filtered_data['Cluster'].iloc[0]
         if user_cluster in cluster_descriptions:
-            st.write(f"### Opis klastra {user_cluster}")
+            st.write(f"### Model przydzielił Cię do klastra numer {user_cluster}")
             st.write(cluster_descriptions[user_cluster])
     else:
         st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
@@ -360,6 +367,7 @@ def goals_and_progress():
     ]
     ax.bar(categories, values, color=['#1b4332', '#40916c', '#74c69d'])
     ax.set_ylim(0, 150)
+    plt.grid(True)
     st.pyplot(fig)
 
 def main():
