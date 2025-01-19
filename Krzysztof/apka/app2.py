@@ -153,7 +153,7 @@ def predictive_heart_section():
     
     st.header("Ryzyko sercowe")
     st.divider()
-    st.markdown("Sekcja ta analizuje dane dotyczące Twojego tętna, wieku oraz innych cech zdrowotnych, aby ocenić ryzyko problemów sercowo-naczyniowych. Na podstawie zaawansowanego algorytmu grupowania (KMeans) użytkownicy są przypisywani do jednego z trzech klastrów, które reprezentują różne poziomy ryzyka: niskie, umiarkowane lub wysokie. Wyniki są prezentowane w formie wykresu klastrów oraz szczegółowego opisu przypisanego klastru, wraz z rekomendacjami dotyczącymi stylu życia i działań prozdrowotnych. Dzięki tej analizie możesz lepiej zrozumieć swoje ryzyko sercowe i podjąć kroki w celu jego zmniejszenia.")
+    st.markdown("Sekcja ta analizuje dane dotyczące Twojego tętna, wieku oraz innych cech zdrowotnych, aby ocenić ryzyko problemów sercowo-naczyniowych. Na podstawie zaawansowanego algorytmu grupowania (KMeans) użytkownicy są przypisywani do jednej z trzech grup, które reprezentują różne poziomy ryzyka: niskie, umiarkowane lub wysokie. Wyniki są prezentowane w formie wykresu oraz szczegółowego opisu przypisanej grupy, wraz z rekomendacjami dotyczącymi stylu życia i działań prozdrowotnych. Dzięki tej analizie możesz lepiej zrozumieć swoje ryzyko sercowe i podjąć kroki w celu jego zmniejszenia.")
     
     filtered_data = st.session_state.get('filtered_data')
 
@@ -183,13 +183,13 @@ def predictive_heart_section():
             user_cluster = clusters[0]
             
             cluster_descriptions = {
-                0: "Niskie ryzyko sercowe: Użytkownicy w tym klastrze mają stabilne tętno spoczynkowe oraz niskie wartości znormalizowanego tętna. Wskaźniki te sugerują dobrą kondycję serca oraz niskie ryzyko wystąpienia problemów sercowo-naczyniowych. Zaleca się kontynuowanie obecnego stylu życia z naciskiem na regularną aktywność fizyczną i zbilansowaną dietę.",
-                1: "Umiarkowane ryzyko sercowe: Użytkownicy w tym klastrze mają umiarkowane wartości tętna spoczynkowego oraz średnie korelacje między tętnem a aktywnością krokową. Wskazuje to na pewne wyzwania dla układu sercowo-naczyniowego, ale bez znaczących zagrożeń. Rekomenduje się włączenie umiarkowanych ćwiczeń aerobowych i kontrolowanie masy ciała. Regularne badania sercowo-naczyniowe są wskazane, aby monitorować ewentualne zmiany.",
+                0: "Niskie ryzyko sercowe: Użytkownicy mają stabilne tętno spoczynkowe oraz niskie wartości znormalizowanego tętna. Wskaźniki te sugerują dobrą kondycję serca oraz niskie ryzyko wystąpienia problemów sercowo-naczyniowych. Zaleca się kontynuowanie obecnego stylu życia z naciskiem na regularną aktywność fizyczną i zbilansowaną dietę.",
+                1: "Umiarkowane ryzyko sercowe: Użytkownicy mają umiarkowane wartości tętna spoczynkowego oraz średnie korelacje między tętnem a aktywnością krokową. Wskazuje to na pewne wyzwania dla układu sercowo-naczyniowego, ale bez znaczących zagrożeń. Rekomenduje się włączenie umiarkowanych ćwiczeń aerobowych i kontrolowanie masy ciała. Regularne badania sercowo-naczyniowe są wskazane, aby monitorować ewentualne zmiany.",
                 2: "Wysokie ryzyko sercowe: Użytkownicy mają podwyższone tętno spoczynkowe, a korelacje między aktywnością a tętnem są niewielkie lub niestabilne. Może to sugerować przeciążenie serca lub inne nieprawidłowości. Zaleca się pilną konsultację z lekarzem w celu wykonania szczegółowych badań. Ważne jest także wprowadzenie zmian w stylu życia, takich jak dieta uboga w tłuszcze nasycone i unikanie stresu."
             }
 
             if user_cluster in cluster_descriptions:
-                st.write(f"### Model przydzielił Cię do klastra numer {user_cluster}")
+                st.write(f"### Model przydzielił Cię do grupy: {user_cluster}")
                 st.write(cluster_descriptions[user_cluster])
     else:
         st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
@@ -222,7 +222,7 @@ def activity_evaluation_section():
     """Evaluate user activity using PCA and clustering."""
     st.header("Ocena aktywności")
     st.divider()
-    st.markdown("Sekcja ta analizuje Twoje dane związane z codzienną aktywnością, takie jak liczba kroków, spalone kalorie, dystans i tętno. Wykorzystując techniki analizy danych, takie jak PCA i algorytm grupowania (KMeans), aplikacja klasyfikuje Twoje poziomy aktywności do jednego z trzech klastrów: niskiej, umiarkowanej lub wysokiej aktywności. Wyniki są prezentowane w formie wizualizacji na wykresie oraz opisów, które pomogą Ci zrozumieć Twój obecny poziom aktywności i uzyskać wskazówki dotyczące jej optymalizacji. Dzięki temu możesz podejmować świadome decyzje o poprawie swojego stylu życia.")
+    st.markdown("Sekcja ta analizuje Twoje dane związane z codzienną aktywnością, takie jak liczba kroków, spalone kalorie, dystans i tętno. Wykorzystując techniki analizy danych, takie jak PCA i algorytm grupowania (KMeans), aplikacja klasyfikuje Twoje poziomy aktywności: niska, umiarkowana lub wysoka aktywność. Wyniki są prezentowane w formie wizualizacji na wykresie oraz opisów, które pomogą Ci zrozumieć Twój obecny poziom aktywności i uzyskać wskazówki dotyczące jej optymalizacji. Dzięki temu możesz podejmować świadome decyzje o poprawie swojego stylu życia.")
     st.divider()
     filtered_data = st.session_state.get('filtered_data')
 
@@ -272,7 +272,7 @@ def activity_evaluation_section():
             y='Value', 
             hue='Cluster'
         )
-        ax_bar.set_title("Średnie wartości kroków i rytmu serca w poszczególnych klastrach")
+        ax_bar.set_title("Średnie wartości kroków i rytmu serca w poszczególnych grupach")
         ax_bar.set_xlabel("Cechy aktywności")
         ax_bar.set_ylabel("Średnia wartość")
         st.pyplot(fig_bar)
@@ -285,7 +285,7 @@ def activity_evaluation_section():
 
         user_cluster = filtered_data['Cluster'].iloc[0]
         if user_cluster in cluster_descriptions:
-            st.write(f"### Model przydzielił Cię do klastra numer {user_cluster}")
+            st.write(f"### Model przydzielił Cię do grupy {user_cluster}")
             st.write(cluster_descriptions[user_cluster])
     else:
         st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
