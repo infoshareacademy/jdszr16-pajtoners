@@ -30,7 +30,6 @@ def filter_data_by_user_id(df):
     if "user_id" not in st.session_state:
         st.session_state.user_id = 0
 
-    # Dynamic `user_id`
     st.session_state.user_id = st.number_input("Wpisz user_id", min_value=0, step=1, value=st.session_state.user_id)
     
     if st.session_state.user_id in df['user_id'].values:
@@ -71,14 +70,12 @@ def visualize_bmi(bmi):
     """Function to visualize BMI categories and user's BMI."""
     st.subheader("Twoje BMI w porównaniu do klasyfikacji BMI")
 
-    # BMI categories and thresholds
     categories = ["Niedowaga", "Normalna waga", "Nadwaga", "Otyłość"]
     thresholds = [18.5, 24.9, 29.9, 40]
     colors = ['#74c69d', '#40916c', '#f9c74f', '#f94144']
 
     fig, ax = plt.subplots(figsize=(8, 4))
 
-    # Plot the categories as bars
     start = 0
     for category, threshold, color in zip(categories, thresholds, colors):
         width = threshold - start
@@ -273,8 +270,7 @@ def activity_evaluation_section():
             data=melted_data, 
             x='Feature', 
             y='Value', 
-            hue='Cluster', 
-            ax=ax_bar,
+            hue='Cluster'
         )
         ax_bar.set_title("Średnie wartości kroków i rytmu serca w poszczególnych klastrach")
         ax_bar.set_xlabel("Cechy aktywności")
@@ -514,6 +510,8 @@ def main():
         st.markdown("- Ryzyko sercowe: Analiza danych pomagająca ocenić potencjalne ryzyko chorób sercowo-naczyniowych, oparta na Twoich wynikach i aktywności.")
         st.markdown("- Ocena aktywności: Szczegółowe statystyki, które wskażą, jak dobrze realizujesz swoje cele aktywności fizycznej oraz gdzie można wprowadzić ulepszenia.")
         st.markdown("- Poprawa kondycji: Moduł oceniający, czy Twoja kondycja poprawiła się na podstawie analizy danych historycznych, oraz wskazówki, jak dalej ją rozwijać.")
+        st.markdown("- Cele i postępy: Dzięki interaktywnemu wykresowi, śledzisz swoje postępy i widzisz, w jakim stopniu udało Ci się zrealizować plan treningowy. ")
+        st.markdown("- Sprawdź swoje możliwości: Chcesz wiedzieć ile kcal spalisz wykonując określoną liczbę kroków? Skorzystaj z tej zakładki, jest to idealne narzędzie do zaplanowania aktywności fizycznej dostosowanej do Twoich potrzeb! ")
         st.markdown("Zanurz się w analizie swoich danych i odkryj, co Twoje Apple Watch ma Ci do powiedzenia! :blush:")
 
 if __name__ == "__main__":
