@@ -1,3 +1,5 @@
+from models_module import MLModels
+
 from streamlit_option_menu import option_menu
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
@@ -10,6 +12,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+
+ml_models = MLModels()
 
 def load_data():
     """Function to load the dataset."""
@@ -30,7 +34,6 @@ def filter_data_by_user_id(df):
     if "user_id" not in st.session_state:
         st.session_state.user_id = 0
 
-    # Dynamic `user_id`
     st.session_state.user_id = st.number_input("Wpisz user_id", min_value=0, step=1, value=st.session_state.user_id)
     
     if st.session_state.user_id in df['user_id'].values:
@@ -39,22 +42,61 @@ def filter_data_by_user_id(df):
 
         st.subheader("Podsumowanie dla wybranego użytkownika")
         
-        summary_text = (
+        weight = filtered_df['weight'].iloc[0]
+        height_m = filtered_df['height'].iloc[0] / 100
+        bmi = weight / (height_m ** 2)
+        
+        max_heart = filtered_df['Heart'].max()
+        
+        summary_data = (
             f"Wiek: {filtered_df['age'].iloc[0]}\n"
             f"Płeć: {'mężczyzna' if filtered_df['gender'].iloc[0] == 1 else 'kobieta'}\n"
             f"Wzrost (cm): {filtered_df['height'].iloc[0]}\n"
             f"Waga (kg): {filtered_df['weight'].iloc[0]}\n"
-            f"Suma kroków: {filtered_df['Steps'].sum():.0f}\n"
+            f"Kalkulacja BMI: {bmi:.2f}\n"
+            f"Suma kroków: {filtered_df['Steps'].max():.0f}\n"
             f"Średnie tętno: {filtered_df['Heart'].mean():.2f}\n"
+            f"Maksymalne tętno: {max_heart:.2f}\n"
             f"Suma kalorii: {filtered_df['Calories'].sum():.2f}\n"
             f"Suma dystansu (km): {filtered_df['Distance'].sum():.2f}"
         )
-        st.text_area("Szczegóły użytkownika:", value=summary_text, height=200, disabled=True)
+        st.text(summary_data)
+        
+        visualize_bmi(bmi)
+
         return filtered_df
     else:
         st.warning(f"Brak danych dla user_id: {st.session_state.user_id}")
         st.session_state.filtered_data = None
         return None
+
+def visualize_bmi(bmi):
+    """Function to visualize BMI categories and user's BMI."""
+    st.subheader("Twoje BMI w porównaniu do klasyfikacji BMI")
+
+    categories = ["Niedowaga", "Normalna waga", "Nadwaga", "Otyłość"]
+    thresholds = [18.5, 24.9, 29.9, 40]
+    colors = ['#74c69d', '#40916c', '#f9c74f', '#f94144']
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+
+    start = 0
+    for category, threshold, color in zip(categories, thresholds, colors):
+        width = threshold - start
+        ax.barh(0, width, left=start, color=color, label=category, edgecolor='black')
+        start = threshold
+
+    # Add user's BMI as a vertical line
+    ax.axvline(bmi, color='blue', linestyle='--', label=f'Twoje BMI: {bmi:.2f}')
+
+    # Formatting
+    ax.set_yticks([])
+    ax.set_xticks([0, *thresholds])
+    ax.set_xlim(0, max(thresholds))
+    ax.set_title("Klasyfikacja BMI")
+    ax.legend(loc="upper right")
+
+    st.pyplot(fig)
 
 def plot_charts(df):
     """Function to plot charts"""
@@ -71,45 +113,43 @@ def plot_charts(df):
         if 'activity_trimmed' in filtered_data.columns:
             activity_counts = filtered_data['activity_trimmed'].value_counts()
             fig, ax = plt.subplots(figsize=(8, 8))
-            ax.pie(
-                activity_counts,
-                labels=activity_counts.index,
-                autopct='%1.1f%%',
-                startangle=90,
-                colors=sns.color_palette("pastel")
-            )
+            ax.bar(activity_counts.index, activity_counts, color=sns.color_palette("pastel"))
             ax.set_title("Proporcje czasu spędzonego na różnych aktywnościach")
-            st.pyplot(fig)
+
+            ax.set_xlabel("Rodzaj aktywności")
+            ax.set_ylabel("Liczba wystąpień")
+            ax.set_xticklabels(activity_counts.index, rotation=45, ha='right')
+            st.pyplot(fig) 
         else:
             st.warning("Brak wymaganej kolumny 'activity_trimmed' w danych.")
         
         st.divider()
-        st.subheader("Średnie tętno dla każdej aktywności")
+        st.subheader("Wykres tętna dla każdej aktywności")
         if 'activity_trimmed' in filtered_data.columns and 'Heart' in filtered_data.columns:
             mean_heart_by_activity = filtered_data.groupby('activity_trimmed')['Heart'].mean().reset_index()
+            max_heart_by_activity = filtered_data.groupby('activity_trimmed')['Heart'].max().reset_index()
+            min_heart_by_activity = filtered_data.groupby('activity_trimmed')['Heart'].min().reset_index()
+
+            # Sort by mean heart rate descending
+            mean_heart_by_activity = mean_heart_by_activity.sort_values(by='Heart', ascending=False)
+            max_heart_by_activity = max_heart_by_activity.set_index('activity_trimmed').loc[mean_heart_by_activity['activity_trimmed']].reset_index()
+            min_heart_by_activity = min_heart_by_activity.set_index('activity_trimmed').loc[mean_heart_by_activity['activity_trimmed']].reset_index()
+            
             fig, ax = plt.subplots(figsize=(10, 6))
-            sns.barplot(data=mean_heart_by_activity, x='activity_trimmed', y='Heart', ax=ax)
-            ax.set_title('Średnie tętno dla każdej aktywności')
+            sns.barplot(data=mean_heart_by_activity, x='activity_trimmed', y='Heart', ax=ax, label="Średnie tętno")
+            sns.lineplot(data=max_heart_by_activity, x='activity_trimmed', y='Heart', ax=ax, color='red', marker='o', label="Maksymalne tętno")
+            sns.lineplot(data=min_heart_by_activity, x='activity_trimmed', y='Heart', ax=ax, color='blue', marker='o', label="Minimalne tętno")
+            ax.set_title('Średnie, maksymalne i minimalne tętno dla każdej aktywności')
             ax.set_xlabel('Rodzaj aktywności')
-            ax.set_ylabel('Średnie tętno')
+            ax.set_ylabel('Tętno')
+            ax.legend()
             st.pyplot(fig)
         else:
             st.warning("Brak wymaganych kolumn 'activity_trimmed' lub 'Heart' w danych.")
 
         st.divider()
-        st.subheader("Zależność między spalonymi kaloriami a dystansem")
-        if 'Calories' in filtered_data.columns and 'Distance' in filtered_data.columns:
-            
-            sorted_data = filtered_data.sort_values(by='Distance')
-            
-            fig, ax = plt.subplots(figsize=(10, 6))
-            sns.lineplot(data=sorted_data, x='Steps', y='Calories', ax=ax, color='blue', lw=2)
-            ax.set_title("Zależność między spalonymi kaloriami a dystansem")
-            ax.set_xlabel("Kroki")
-            ax.set_ylabel("Spalone kalorie")
-            st.pyplot(fig)
-        else:
-            st.warning("Brak wymaganych kolumn 'Calories' lub 'Distance' w danych.")
+        st.subheader("Wykres tętna dla każdej aktywności")
+                
     else:
         st.warning("Najpierw wybierz użytkownika w zakładce 'Wczytaj dane'.")
 
@@ -118,6 +158,7 @@ def predictive_heart_section():
     st.header("Ryzyko sercowe")
     st.divider()
     st.markdown("Sekcja ta analizuje dane dotyczące Twojego tętna, wieku oraz innych cech zdrowotnych, aby ocenić ryzyko problemów sercowo-naczyniowych. Na podstawie zaawansowanego algorytmu grupowania (KMeans) użytkownicy są przypisywani do jednego z trzech klastrów, które reprezentują różne poziomy ryzyka: niskie, umiarkowane lub wysokie. Wyniki są prezentowane w formie wykresu klastrów oraz szczegółowego opisu przypisanego klastru, wraz z rekomendacjami dotyczącymi stylu życia i działań prozdrowotnych. Dzięki tej analizie możesz lepiej zrozumieć swoje ryzyko sercowe i podjąć kroki w celu jego zmniejszenia.")
+    
     filtered_data = st.session_state.get('filtered_data')
 
     if filtered_data is not None and not filtered_data.empty:
@@ -130,16 +171,19 @@ def predictive_heart_section():
         pca_data, clusters = apply_kmeans_heart_based(numeric_data)
         if pca_data is not None:
             st.write("### Szczegółowa analiza oceny ryzyka sercowego")
-            fig, ax = plt.subplots(figsize=(8, 6))
-            scatter = ax.scatter(
-                pca_data[:, 0], pca_data[:, 1], c=clusters, cmap='viridis', alpha=0.7
-            )
-            plt.colorbar(scatter, label="Klaster")
-            ax.set_title("KMeans - Przypisanie do klastrów")
-            ax.set_xlabel("Feature 1")
-            ax.set_ylabel("Feature 2")
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.regplot(x='Intensity', y='SDNormalizedHR', data=filtered_data, scatter_kws={'alpha': 0.6}, line_kws={'color': 'red'}, ax=ax)
+            
+            scatter_handle = plt.Line2D([0], [0], color='red', label='Linia regresji')  # Uchwyty dla linii
+            points_handle = plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', alpha=0.6, label='Rytm serca')
+            
+            plt.title(' ')
+            ax.set_xlabel('Intensywność')
+            ax.set_ylabel('Wahania rytmu serca')
+            plt.legend(handles=[scatter_handle, points_handle])
+            plt.grid(True)
             st.pyplot(fig)
-
+            
             user_cluster = clusters[0]
             
             cluster_descriptions = {
@@ -149,7 +193,7 @@ def predictive_heart_section():
             }
 
             if user_cluster in cluster_descriptions:
-                st.write(f"### Opis klastra {user_cluster}")
+                st.write(f"### Model przydzielił Cię do klastra numer {user_cluster}")
                 st.write(cluster_descriptions[user_cluster])
     else:
         st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
@@ -165,11 +209,9 @@ def apply_kmeans_heart_based(df):
             missing = set(kmeans_features) - set(available_features)
             st.warning(f"Brakuje następujących cech: {missing}")
 
-        scaler = StandardScaler()
-        standardized_data = scaler.fit_transform(df[available_features].dropna())
+        standardized_data = ml_models.scale_data(df[available_features].dropna())
 
-        kmeans = KMeans(n_clusters=3, random_state=42, init='k-means++', max_iter=500)
-        clusters = kmeans.fit_predict(standardized_data)
+        clusters = ml_models.cluster_data(standardized_data)
 
         df['Cluster'] = clusters
 
@@ -212,15 +254,30 @@ def activity_evaluation_section():
         clusters = kmeans.fit_predict(pca_data)
         filtered_data['Cluster'] = clusters
 
-        fig, ax = plt.subplots(figsize=(8, 6))
-        scatter = ax.scatter(
-            pca_data[:, 0], pca_data[:, 1], c=clusters, cmap='viridis', alpha=0.7
+        melted_data = filtered_data.melt(
+            id_vars=['Cluster'], 
+            value_vars=['Steps', 'Heart'], 
+            var_name='Feature', 
+            value_name='Value'
         )
-        plt.colorbar(scatter, label="Klaster")
-        ax.set_title("PCA i KMeans - Aktywność użytkowników")
-        ax.set_xlabel("PCA1")
-        ax.set_ylabel("PCA2")
-        st.pyplot(fig)
+
+        polish_labels = {
+            'Steps': 'Kroki',
+            'Heart': 'Rytm serca'
+        }
+        melted_data['Feature'] = melted_data['Feature'].map(polish_labels)
+        
+        fig_bar, ax_bar = plt.subplots(figsize=(10, 6))
+        sns.barplot(
+            data=melted_data, 
+            x='Feature', 
+            y='Value', 
+            hue='Cluster'
+        )
+        ax_bar.set_title("Średnie wartości kroków i rytmu serca w poszczególnych klastrach")
+        ax_bar.set_xlabel("Cechy aktywności")
+        ax_bar.set_ylabel("Średnia wartość")
+        st.pyplot(fig_bar)
 
         cluster_descriptions = {
             0: "Niska aktywność: Użytkownicy z minimalną liczbą kroków i spalonymi kaloriami. Zalecana zwiększona aktywność fizyczna.",
@@ -230,7 +287,7 @@ def activity_evaluation_section():
 
         user_cluster = filtered_data['Cluster'].iloc[0]
         if user_cluster in cluster_descriptions:
-            st.write(f"### Opis klastra {user_cluster}")
+            st.write(f"### Model przydzielił Cię do klastra numer {user_cluster}")
             st.write(cluster_descriptions[user_cluster])
     else:
         st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
@@ -322,7 +379,7 @@ def goals_and_progress():
     distance_goal = st.number_input("Cel dystansu (km)", min_value=0.0, value=5.0, step=0.5)
 
     st.subheader("Postęp w realizacji celów")
-    total_steps = filtered_data['Steps'].sum()
+    total_steps = filtered_data['Steps'].max()
     total_calories = filtered_data['Calories'].sum()
     total_distance = filtered_data['Distance'].sum()
 
@@ -338,8 +395,51 @@ def goals_and_progress():
         (total_distance / distance_goal) * 100
     ]
     ax.bar(categories, values, color=['#1b4332', '#40916c', '#74c69d'])
-    ax.set_ylim(0, 150)
+    max_value = max(values)
+    ax.set_ylim(0, max(max_value + 10, 150))
+    plt.grid(True)
     st.pyplot(fig)
+
+
+def what_if_section():
+    """Co jeśli? Sekcja przewidywania liczby kroków lub kalorii."""
+    st.header("Sprawdź swoje możliwości")
+    st.divider()
+    st.markdown(
+        "W tej sekcji możesz sprawdzić, ile kroków musisz zrobić, aby osiągnąć określoną liczbę spalonych kalorii, "
+        "lub ile kalorii spalisz przy zadanej liczbie kroków."
+    )
+
+    filtered_data = st.session_state.get('filtered_data')
+
+    if filtered_data is not None and not filtered_data.empty:
+        # Obliczenie średniego spalania kalorii na krok
+        total_steps = filtered_data['Steps'].sum()
+        total_calories = filtered_data['Calories'].sum()
+
+        if total_steps > 0 and total_calories > 0:
+            calories_per_step = total_calories / total_steps
+
+            st.write(f"### Twoje średnie spalanie kalorii na krok wynosi: {calories_per_step:.4f} kcal/krok.")
+
+            # Wybór trybu kalkulacji
+            option = st.radio("Co chcesz obliczyć?", ["Ilość kroków na spalenie kalorii", "Spalone kalorie dla zadanych kroków"])
+
+            if option == "Ilość kroków na spalenie kalorii":
+                target_calories = st.number_input("Wpisz liczbę kalorii do spalenia:", min_value=0.0, step=10.0)
+                if target_calories > 0:
+                    required_steps = target_calories / calories_per_step
+                    st.success(f"Aby spalić **{target_calories:.1f} kcal**, musisz zrobić około **{required_steps:.0f} kroków**.")
+
+            elif option == "Spalone kalorie dla zadanych kroków":
+                target_steps = st.number_input("Wpisz liczbę kroków:", min_value=0, step=100)
+                if target_steps > 0:
+                    burned_calories = target_steps * calories_per_step
+                    st.success(f"Dla **{target_steps} kroków** spalisz około **{burned_calories:.1f} kcal**.")
+        else:
+            st.warning("Nie można obliczyć średniego spalania kalorii na krok. Sprawdź, czy dane zawierają kroki i spalone kalorie.")
+    else:
+        st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
 
 def main():
     
@@ -362,8 +462,8 @@ def main():
         
         menu = option_menu(
             menu_title="Menu",  
-            options=["Wczytaj dane", "Wykresy", "Ryzyko sercowe", "Ocena aktywności", "Poprawa kondycji", "Cele i postępy", "O aplikacji"],  
-            icons=["cloud-upload", "bar-chart-line", "heart", "clipboard-check", "person-arms-up", "graph-up-arrow", "gear"], 
+            options=["Wczytaj dane", "Wykresy", "Ryzyko sercowe", "Ocena aktywności", "Poprawa kondycji", "Cele i postępy","Sprawdź swoje możliwości","O aplikacji"],  
+            icons=["cloud-upload", "bar-chart-line", "heart", "clipboard-check", "person-arms-up", "graph-up-arrow","calculator", "gear"], 
             menu_icon="cast", 
             default_index=0,
             orientation="vertical",
@@ -399,11 +499,21 @@ def main():
         
     elif menu == "Cele i postępy":
         goals_and_progress()
+
+    elif menu == "Sprawdź swoje możliwości":
+        what_if_section()
     
     elif menu == "O aplikacji":
         st.header("Witaj w naszej aplikacji, stworzonej specjalnie do analizy danych pochodzących z Apple Watch! :tada:")
         st.divider()
-        st.markdown("Nasza aplikacja pozwala na wczytanie pliku zawierającego dane o Twojej aktywności fizycznej, takich jak liczba kroków, pokonany dystans, tętno czy spalone kalorie. Dzięki temu możesz w prosty i przejrzysty sposób eksplorować swoje osiągnięcia i dowiedzieć się więcej o swoich nawykach ruchowych oraz zaplanować kolejne treningi! W kolejnych zakładkach znajdziesz: Wykresy: Interaktywne wizualizacje, które pomogą Ci zrozumieć, jakie aktywności wpływały na spalone kalorie i jak wyglądają zależności pomiędzy różnymi parametrami. Podsumowanie aktywności: Szczegółowe statystyki, które pozwolą Ci przeanalizować swoje wyniki i odkryć potencjalne obszary do poprawy.")
+        st.markdown("Nasza aplikacja umożliwia wczytanie pliku z danymi o Twojej aktywności fizycznej, takimi jak liczba kroków, pokonany dystans, tętno czy spalone kalorie. Dzięki temu możesz w prosty sposób eksplorować swoje osiągnięcia, zrozumieć swoje nawyki ruchowe i zaplanować kolejne kroki w drodze do lepszej kondycji!")
+        st.markdown("W naszej aplikacji znajdziesz następujące zakładki:")
+        st.markdown(" - Wykresy: Interaktywne wizualizacje, które pomogą Ci zrozumieć, jakie aktywności wpływają na spalone kalorie oraz odkryć zależności między różnymi parametrami Twojej aktywności.")
+        st.markdown("- Ryzyko sercowe: Analiza danych pomagająca ocenić potencjalne ryzyko chorób sercowo-naczyniowych, oparta na Twoich wynikach i aktywności.")
+        st.markdown("- Ocena aktywności: Szczegółowe statystyki, które wskażą, jak dobrze realizujesz swoje cele aktywności fizycznej oraz gdzie można wprowadzić ulepszenia.")
+        st.markdown("- Poprawa kondycji: Moduł oceniający, czy Twoja kondycja poprawiła się na podstawie analizy danych historycznych, oraz wskazówki, jak dalej ją rozwijać.")
+        st.markdown("- Cele i postępy: Dzięki interaktywnemu wykresowi, śledzisz swoje postępy i widzisz, w jakim stopniu udało Ci się zrealizować plan treningowy. ")
+        st.markdown("- Sprawdź swoje możliwości: Chcesz wiedzieć ile kcal spalisz wykonując określoną liczbę kroków? Skorzystaj z tej zakładki, jest to idealne narzędzie do zaplanowania aktywności fizycznej dostosowanej do Twoich potrzeb! ")
         st.markdown("Zanurz się w analizie swoich danych i odkryj, co Twoje Apple Watch ma Ci do powiedzenia! :blush:")
 
 if __name__ == "__main__":

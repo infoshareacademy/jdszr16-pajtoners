@@ -30,7 +30,6 @@ def filter_data_by_user_id(df):
     if "user_id" not in st.session_state:
         st.session_state.user_id = 0
 
-    # Dynamic `user_id`
     st.session_state.user_id = st.number_input("Wpisz user_id", min_value=0, step=1, value=st.session_state.user_id)
     
     if st.session_state.user_id in df['user_id'].values:
@@ -51,7 +50,7 @@ def filter_data_by_user_id(df):
             f"Wzrost (cm): {filtered_df['height'].iloc[0]}\n"
             f"Waga (kg): {filtered_df['weight'].iloc[0]}\n"
             f"Kalkulacja BMI: {bmi:.2f}\n"
-            f"Suma kroków: {filtered_df['Steps'].sum():.0f}\n"
+            f"Suma kroków: {filtered_df['Steps'].max():.0f}\n"
             f"Średnie tętno: {filtered_df['Heart'].mean():.2f}\n"
             f"Maksymalne tętno: {max_heart:.2f}\n"
             f"Suma kalorii: {filtered_df['Calories'].sum():.2f}\n"
@@ -59,11 +58,41 @@ def filter_data_by_user_id(df):
         )
         st.text(summary_data)
         
+        visualize_bmi(bmi)
+
         return filtered_df
     else:
         st.warning(f"Brak danych dla user_id: {st.session_state.user_id}")
         st.session_state.filtered_data = None
         return None
+
+def visualize_bmi(bmi):
+    """Function to visualize BMI categories and user's BMI."""
+    st.subheader("Twoje BMI w porównaniu do klasyfikacji BMI")
+
+    categories = ["Niedowaga", "Normalna waga", "Nadwaga", "Otyłość"]
+    thresholds = [18.5, 24.9, 29.9, 40]
+    colors = ['#74c69d', '#40916c', '#f9c74f', '#f94144']
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+
+    start = 0
+    for category, threshold, color in zip(categories, thresholds, colors):
+        width = threshold - start
+        ax.barh(0, width, left=start, color=color, label=category, edgecolor='black')
+        start = threshold
+
+    # Add user's BMI as a vertical line
+    ax.axvline(bmi, color='blue', linestyle='--', label=f'Twoje BMI: {bmi:.2f}')
+
+    # Formatting
+    ax.set_yticks([])
+    ax.set_xticks([0, *thresholds])
+    ax.set_xlim(0, max(thresholds))
+    ax.set_title("Klasyfikacja BMI")
+    ax.legend(loc="upper right")
+
+    st.pyplot(fig)
 
 def plot_charts(df):
     """Function to plot charts"""
@@ -80,15 +109,13 @@ def plot_charts(df):
         if 'activity_trimmed' in filtered_data.columns:
             activity_counts = filtered_data['activity_trimmed'].value_counts()
             fig, ax = plt.subplots(figsize=(8, 8))
-            ax.pie(
-                activity_counts,
-                labels=activity_counts.index,
-                autopct='%1.1f%%',
-                startangle=90,
-                colors=sns.color_palette("pastel")
-            )
+            ax.bar(activity_counts.index, activity_counts, color=sns.color_palette("pastel"))
             ax.set_title("Proporcje czasu spędzonego na różnych aktywnościach")
-            st.pyplot(fig)
+
+            ax.set_xlabel("Rodzaj aktywności")
+            ax.set_ylabel("Liczba wystąpień")
+            ax.set_xticklabels(activity_counts.index, rotation=45, ha='right')
+            st.pyplot(fig) 
         else:
             st.warning("Brak wymaganej kolumny 'activity_trimmed' w danych.")
         
@@ -117,6 +144,7 @@ def plot_charts(df):
             st.warning("Brak wymaganych kolumn 'activity_trimmed' lub 'Heart' w danych.")
 
         st.divider()
+        st.subheader("Wykres tętna dla każdej aktywności")
                 
     else:
         st.warning("Najpierw wybierz użytkownika w zakładce 'Wczytaj dane'.")
@@ -242,8 +270,7 @@ def activity_evaluation_section():
             data=melted_data, 
             x='Feature', 
             y='Value', 
-            hue='Cluster', 
-            ax=ax_bar,
+            hue='Cluster'
         )
         ax_bar.set_title("Średnie wartości kroków i rytmu serca w poszczególnych klastrach")
         ax_bar.set_xlabel("Cechy aktywności")
@@ -350,7 +377,7 @@ def goals_and_progress():
     distance_goal = st.number_input("Cel dystansu (km)", min_value=0.0, value=5.0, step=0.5)
 
     st.subheader("Postęp w realizacji celów")
-    total_steps = filtered_data['Steps'].sum()
+    total_steps = filtered_data['Steps'].max()
     total_calories = filtered_data['Calories'].sum()
     total_distance = filtered_data['Distance'].sum()
 
@@ -366,9 +393,51 @@ def goals_and_progress():
         (total_distance / distance_goal) * 100
     ]
     ax.bar(categories, values, color=['#1b4332', '#40916c', '#74c69d'])
-    ax.set_ylim(0, 150)
+    max_value = max(values)
+    ax.set_ylim(0, max(max_value + 10, 150))
     plt.grid(True)
     st.pyplot(fig)
+
+
+def what_if_section():
+    """Co jeśli? Sekcja przewidywania liczby kroków lub kalorii."""
+    st.header("Sprawdź swoje możliwości")
+    st.divider()
+    st.markdown(
+        "W tej sekcji możesz sprawdzić, ile kroków musisz zrobić, aby osiągnąć określoną liczbę spalonych kalorii, "
+        "lub ile kalorii spalisz przy zadanej liczbie kroków."
+    )
+
+    filtered_data = st.session_state.get('filtered_data')
+
+    if filtered_data is not None and not filtered_data.empty:
+        # Obliczenie średniego spalania kalorii na krok
+        total_steps = filtered_data['Steps'].sum()
+        total_calories = filtered_data['Calories'].sum()
+
+        if total_steps > 0 and total_calories > 0:
+            calories_per_step = total_calories / total_steps
+
+            st.write(f"### Twoje średnie spalanie kalorii na krok wynosi: {calories_per_step:.4f} kcal/krok.")
+
+            # Wybór trybu kalkulacji
+            option = st.radio("Co chcesz obliczyć?", ["Ilość kroków na spalenie kalorii", "Spalone kalorie dla zadanych kroków"])
+
+            if option == "Ilość kroków na spalenie kalorii":
+                target_calories = st.number_input("Wpisz liczbę kalorii do spalenia:", min_value=0.0, step=10.0)
+                if target_calories > 0:
+                    required_steps = target_calories / calories_per_step
+                    st.success(f"Aby spalić **{target_calories:.1f} kcal**, musisz zrobić około **{required_steps:.0f} kroków**.")
+
+            elif option == "Spalone kalorie dla zadanych kroków":
+                target_steps = st.number_input("Wpisz liczbę kroków:", min_value=0, step=100)
+                if target_steps > 0:
+                    burned_calories = target_steps * calories_per_step
+                    st.success(f"Dla **{target_steps} kroków** spalisz około **{burned_calories:.1f} kcal**.")
+        else:
+            st.warning("Nie można obliczyć średniego spalania kalorii na krok. Sprawdź, czy dane zawierają kroki i spalone kalorie.")
+    else:
+        st.warning("Najpierw wczytaj dane w zakładce 'Wczytaj dane'.")
 
 def main():
     
@@ -391,8 +460,8 @@ def main():
         
         menu = option_menu(
             menu_title="Menu",  
-            options=["Wczytaj dane", "Wykresy", "Ryzyko sercowe", "Ocena aktywności", "Poprawa kondycji", "Cele i postępy", "O aplikacji"],  
-            icons=["cloud-upload", "bar-chart-line", "heart", "clipboard-check", "person-arms-up", "graph-up-arrow", "gear"], 
+            options=["Wczytaj dane", "Wykresy", "Ryzyko sercowe", "Ocena aktywności", "Poprawa kondycji", "Cele i postępy","Sprawdź swoje możliwości","O aplikacji"],  
+            icons=["cloud-upload", "bar-chart-line", "heart", "clipboard-check", "person-arms-up", "graph-up-arrow","calculator", "gear"], 
             menu_icon="cast", 
             default_index=0,
             orientation="vertical",
@@ -428,11 +497,21 @@ def main():
         
     elif menu == "Cele i postępy":
         goals_and_progress()
+
+    elif menu == "Sprawdź swoje możliwości":
+        what_if_section()
     
     elif menu == "O aplikacji":
         st.header("Witaj w naszej aplikacji, stworzonej specjalnie do analizy danych pochodzących z Apple Watch! :tada:")
         st.divider()
-        st.markdown("Nasza aplikacja pozwala na wczytanie pliku zawierającego dane o Twojej aktywności fizycznej, takich jak liczba kroków, pokonany dystans, tętno czy spalone kalorie. Dzięki temu możesz w prosty i przejrzysty sposób eksplorować swoje osiągnięcia i dowiedzieć się więcej o swoich nawykach ruchowych oraz zaplanować kolejne treningi! W kolejnych zakładkach znajdziesz: Wykresy: Interaktywne wizualizacje, które pomogą Ci zrozumieć, jakie aktywności wpływały na spalone kalorie i jak wyglądają zależności pomiędzy różnymi parametrami. Podsumowanie aktywności: Szczegółowe statystyki, które pozwolą Ci przeanalizować swoje wyniki i odkryć potencjalne obszary do poprawy.")
+        st.markdown("Nasza aplikacja umożliwia wczytanie pliku z danymi o Twojej aktywności fizycznej, takimi jak liczba kroków, pokonany dystans, tętno czy spalone kalorie. Dzięki temu możesz w prosty sposób eksplorować swoje osiągnięcia, zrozumieć swoje nawyki ruchowe i zaplanować kolejne kroki w drodze do lepszej kondycji!")
+        st.markdown("W naszej aplikacji znajdziesz następujące zakładki:")
+        st.markdown(" - Wykresy: Interaktywne wizualizacje, które pomogą Ci zrozumieć, jakie aktywności wpływają na spalone kalorie oraz odkryć zależności między różnymi parametrami Twojej aktywności.")
+        st.markdown("- Ryzyko sercowe: Analiza danych pomagająca ocenić potencjalne ryzyko chorób sercowo-naczyniowych, oparta na Twoich wynikach i aktywności.")
+        st.markdown("- Ocena aktywności: Szczegółowe statystyki, które wskażą, jak dobrze realizujesz swoje cele aktywności fizycznej oraz gdzie można wprowadzić ulepszenia.")
+        st.markdown("- Poprawa kondycji: Moduł oceniający, czy Twoja kondycja poprawiła się na podstawie analizy danych historycznych, oraz wskazówki, jak dalej ją rozwijać.")
+        st.markdown("- Cele i postępy: Dzięki interaktywnemu wykresowi, śledzisz swoje postępy i widzisz, w jakim stopniu udało Ci się zrealizować plan treningowy. ")
+        st.markdown("- Sprawdź swoje możliwości: Chcesz wiedzieć ile kcal spalisz wykonując określoną liczbę kroków? Skorzystaj z tej zakładki, jest to idealne narzędzie do zaplanowania aktywności fizycznej dostosowanej do Twoich potrzeb! ")
         st.markdown("Zanurz się w analizie swoich danych i odkryj, co Twoje Apple Watch ma Ci do powiedzenia! :blush:")
 
 if __name__ == "__main__":
